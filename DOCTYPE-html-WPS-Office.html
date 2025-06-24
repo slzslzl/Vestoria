@@ -1,0 +1,1823 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="gamePageTitle">Вестерия: Загрузка...</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Global loading overlay styles */
+        body.loading-overlay::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        body.loading-overlay .loader-text {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2001;
+            color: white;
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        body.loading-overlay .game-container {
+            display: none; /* Hide game content during loading */
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Custom scrollbar for the game output areas */
+        .scrollable-area::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scrollable-area::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .scrollable-area::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .scrollable-area::-webkit-scrollbar-thumb:hover {
+            background: #555;
+            cursor: pointer;
+        }
+        /* Custom font */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Tooltip styles */
+        .game-tooltip {
+            position: fixed;
+            background-color: #333;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.75rem; /* text-xs */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            white-space: nowrap; /* Prevent text wrapping */
+            transform: translateX(-50%); /* Center horizontally by default */
+            transition: opacity 0.2s;
+            opacity: 0;
+            pointer-events: none;
+            max-width: 250px; /* Limit tooltip width */
+            white-space: normal; /* Allow text to wrap if it exceeds max-width */
+        }
+        .game-tooltip.visible {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        /* Progress bar styles */
+        .progress-bar-container {
+            width: 100%;
+            background-color: #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+            height: 10px;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 5px;
+            text-align: right;
+            transition: width 0.5s ease-in-out;
+        }
+        .xp-bar {
+            background-color: #facc15; /* Yellow for XP */
+        }
+
+        /* Equipment list styling */
+        .equipment-list-item {
+            display: flex;
+            align-items: center;
+            padding: 2px 0;
+            margin-bottom: 4px; /* Spacing between items */
+        }
+        .equipment-list-item i {
+            margin-right: 8px;
+            font-size: 1rem;
+            color: #4a4a4a;
+            width: 1.2em; /* Fixed width for icon alignment */
+            text-align: center;
+        }
+        .equipment-list-item span {
+            font-size: 0.8rem;
+            color: #333;
+        }
+        .equipment-list-item .unequip-btn {
+            margin-left: auto;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            background-color: #ef4444; /* red-500 */
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .equipment-list-item .unequip-btn:hover {
+            background-color: #dc2626; /* red-600 */
+        }
+
+        /* Skill item styling for upgraded effect */
+        .skill-item.upgraded {
+            background-color: #d1fae5; /* green-100 */
+            animation: pulse 1s forwards;
+            border-radius: 5px;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); } /* green-500 */
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* Inventory item use button */
+        .inventory-item .use-btn {
+            margin-left: 8px; /* Space between name and button */
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            background-color: #22c55e; /* green-500 */
+            color: white;
+            border-radius: 44px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .inventory-item .use-btn:hover {
+            background-color: #16a34a; /* green-600 */
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen bg-gray-100 p-4 loading-overlay">
+    <div id="globalLoader" class="loader-text">
+        <i class="fas fa-spinner fa-spin"></i> Загрузка игры, пожалуйста, подождите...
+    </div>
+
+    <div id="gameContainer" class="game-container w-full max-w-6xl bg-white rounded-lg shadow-lg p-6 flex flex-col lg:flex-row gap-6">
+
+        <!-- Left column: World Lore and Characters -->
+        <div class="flex flex-col gap-4 w-full lg:w-1/4">
+            <div class="bg-gray-50 rounded-md p-3 border border-gray-200">
+                <h2 class="font-semibold text-gray-700 mb-2 text-lg">Лор Мира <i class="fas fa-book-open text-gray-500"></i></h2>
+                <div id="loreOutput" class="scrollable-area h-40 overflow-y-auto text-xs leading-relaxed">
+                    <!-- World lore will be displayed here -->
+                </div>
+            </div>
+            <div class="bg-gray-50 rounded-md p-3 border border-gray-200">
+                <h2 class="font-semibold text-gray-700 mb-2 text-lg">Персонажи <i class="fas fa-users text-gray-500"></i></h2>
+                <div id="npcOutput" class="scrollable-area h-40 overflow-y-auto text-xs leading-relaxed">
+                    <!-- NPC information will be displayed here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Central column: Game Output and Controls -->
+        <div class="flex flex-col gap-4 flex-grow w-full lg:w-2/4">
+            <h1 id="gameTitle" class="text-3xl font-bold text-gray-800 text-center mb-2">Вестерия</h1>
+
+            <!-- New: Date, Time, Location, Weather Display -->
+            <div id="timeLocationDisplay" class="bg-blue-100 text-blue-800 text-sm rounded-md p-2 text-center font-medium border border-blue-200">
+                <!-- Date, Time, Location, Weather will be displayed here -->
+            </div>
+
+            <!-- Game Output (story, dialogues) -->
+            <div id="gameOutput" class="scrollable-area overflow-y-auto h-96 bg-gray-50 rounded-md p-3 text-sm leading-relaxed border border-gray-200">
+                <!-- Game text will be displayed here -->
+            </div>
+
+            <!-- Command Input Field -->
+            <div class="flex gap-2 mt-4">
+                <input type="text" id="commandInput" class="flex-grow p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Введите вашу команду..." disabled>
+                <button id="submitCommand" class="px-6 py-3 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>Отправить</button>
+            </div>
+            <!-- Loading Indicator for LLM interaction -->
+            <div id="loadingIndicator" class="text-center text-gray-500 text-sm hidden mt-2">
+                <i class="fas fa-spinner fa-spin mr-2"></i> Венди обдумывает ваш ход...
+            </div>
+             <!-- Dynamic Options/Combat Buttons -->
+            <div id="dynamicOptions" class="flex flex-wrap gap-2 mt-2 justify-center">
+                <!-- Buttons generated by LLM options -->
+            </div>
+
+            <!-- Combat Information (if in combat) -->
+            <div id="combatInfo" class="bg-red-100 text-red-800 text-sm rounded-md p-2 mt-2 hidden border border-red-200">
+                <h3 class="font-semibold text-base mb-1">Бой!</h3>
+                <p id="enemyStatus"></p>
+                <div id="combatLog" class="scrollable-area h-24 overflow-y-auto mt-2 text-xs"></div>
+            </div>
+
+            <!-- Slava's Thoughts Panel -->
+            <div id="slavaThoughtsPanel" class="bg-yellow-100 text-yellow-800 text-sm rounded-md p-2 mt-2 hidden border border-yellow-200">
+                <h3 class="font-semibold text-base mb-1">Мысли Славы <i class="fas fa-brain text-yellow-600"></i></h3>
+                <p id="slavaCurrentThought" class="text-xs italic"></p>
+            </div>
+        </div>
+
+        <!-- Right column: Status, Inventory, Locations and Event Log -->
+        <div class="flex flex-col gap-4 w-full lg:w-1/4">
+            <div class="bg-gray-50 rounded-md p-3 border border-gray-200">
+                <h2 class="font-semibold text-gray-700 mb-2 text-lg">Статус игрока <i class="fas fa-user-circle text-gray-500"></i></h2>
+                <p class="text-xs">Здоровье: <span id="playerHealth" class="font-medium text-green-600"></span></p>
+                <div class="progress-bar-container">
+                    <div id="healthBar" class="progress-bar bg-green-500"></div>
+                </div>
+                <p class="text-xs mt-2">Выносливость: <span id="playerStamina" class="font-medium text-blue-600"></span></p>
+                <div class="progress-bar-container">
+                    <div id="staminaBar" class="progress-bar bg-blue-500"></div>
+                </div>
+                <p class="text-xs mt-2">Опыт: <span id="playerXP" class="font-medium text-yellow-600"></span></p>
+                 <div class="progress-bar-container">
+                    <div id="xpBar" class="progress-bar xp-bar"></div>
+                </div>
+                <p class="text-xs mt-2">Уровень: <span id="playerLevel" class="font-medium text-yellow-600"></span></p>
+                <p class="text-xs mt-2">Очки навыков: <span id="skillPoints" class="font-medium text-purple-600"></span></p>
+                <p class="text-xs mt-2">Деньги: <span id="playerMoney" class="font-medium text-yellow-600"></span></p>
+                <p class="text-xs mt-2">Статусы: <span id="playerStatuses" class="font-medium text-purple-600"></span></p>
+            </div>
+
+            <!-- Replaced "Human Figure" with text-based Equipment Display -->
+            <div class="bg-gray-50 rounded-md p-3 border border-gray-200">
+                <h2 class="font-semibold text-gray-700 mb-2 text-lg">Экипировка <i class="fas fa-shield-alt text-gray-500"></i></h2>
+                <ul id="playerEquipment" class="list-none text-xs">
+                    <!-- Equipped items will be displayed here -->
+                </ul>
+            </div>
+
+            <div class="bg-gray-50 rounded-md p-3 border border-gray-200">
+                <h2 class="font-semibold text-gray-700 mb-2 text-lg">Инвентарь <i class="fas fa-briefcase text-gray-500"></i></h2>
+                <ul id="playerInventory" class="list-disc list-inside text-xs">
+                    <!-- Inventory will be displayed here -->
+                </ul>
+                <h2 class="font-semibold text-gray-700 mt-2 mb-1 text-lg">Навыки <i class="fas fa-star text-gray-500"></i></h2>
+                <ul id="playerSkills" class="list-disc list-inside text-xs">
+                    <!-- Skills will be displayed here -->
+                </ul>
+            </div>
+            <div class="bg-gray-50 rounded-md p-3 border border-gray-200">
+                <h2 class="font-semibold text-gray-700 mb-2 text-lg">Известные Локации <i class="fas fa-map-marked-alt text-gray-500"></i></h2>
+                <div id="locationOutput" class="scrollable-area h-40 overflow-y-auto text-xs leading-relaxed">
+                    <!-- Locations will be displayed here -->
+                </div>
+            </div>
+            <div class="bg-gray-50 rounded-md p-3 border border-gray-200">
+                <h2 class="font-semibold text-gray-700 mb-2 text-lg">Журнал Событий <i class="fas fa-clipboard-list text-gray-500"></i></h2>
+                <div id="eventLogOutput" class="scrollable-area h-40 overflow-y-auto text-xs leading-relaxed">
+                    <!-- Event log will be displayed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- Global Firebase variables (provided by Canvas) ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // --- Firebase imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        let app;
+        let db;
+        let auth;
+        let userId;
+        let isGameReady = false; // Flag to control game readiness for user input
+
+        // --- DOM Elements ---
+        const gamePageTitle = document.getElementById('gamePageTitle'); // Page title
+        const gameTitleEl = document.getElementById('gameTitle'); // Main game title
+        const gameOutput = document.getElementById('gameOutput');
+        const commandInput = document.getElementById('commandInput');
+        const submitCommandBtn = document.getElementById('submitCommand');
+        const playerHealthEl = document.getElementById('playerHealth');
+        const playerStaminaEl = document.getElementById('playerStamina');
+        const playerMoneyEl = document.getElementById('playerMoney');
+        const playerStatusesEl = document.getElementById('playerStatuses');
+        const playerInventoryEl = document.getElementById('playerInventory');
+        const playerSkillsEl = document.getElementById('playerSkills');
+        const loreOutput = document.getElementById('loreOutput');
+        const npcOutput = document.getElementById('npcOutput');
+        const locationOutput = document.getElementById('locationOutput');
+        const eventLogOutput = document.getElementById('eventLogOutput');
+        const timeLocationDisplay = document.getElementById('timeLocationDisplay');
+        const dynamicOptionsDiv = document.getElementById('dynamicOptions');
+        const combatInfoDiv = document.getElementById('combatInfo');
+        const enemyStatusEl = document.getElementById('enemyStatus');
+        const combatLogEl = document.getElementById('combatLog');
+        const healthBarEl = document.getElementById('healthBar');
+        const staminaBarEl = document.getElementById('staminaBar');
+        const xpBarEl = document.getElementById('xpBar');
+        const playerXP_El = document.getElementById('playerXP');
+        const playerLevel_El = document.getElementById('playerLevel');
+        const skillPointsEl = document.getElementById('skillPoints');
+        const loadingIndicatorEl = document.getElementById('loadingIndicator'); // For LLM interaction
+        const globalLoaderEl = document.getElementById('globalLoader'); // For initial game loading
+        const gameContainerEl = document.getElementById('gameContainer'); // Main game UI container
+        const slavaThoughtsPanel = document.getElementById('slavaThoughtsPanel');
+        const slavaCurrentThoughtEl = document.getElementById('slavaCurrentThought');
+        const playerEquipmentEl = document.getElementById('playerEquipment');
+
+        let currentTooltip = null;
+
+        // --- Default Game State Definition (used for new games and merging loaded states) ---
+        const defaultGameStateTemplate = {
+            gameTitle: 'Вестерия',
+            player: {
+                health: 100,
+                stamina: 100,
+                money: 50,
+                xp: 0,
+                level: 1,
+                skillPoints: 2,
+                equippedItems: {
+                    head: null,
+                    torso: null,
+                    weapon: { name: 'Небольшой кованый нож', type: 'weapon', icon: 'fa-solid fa-knife', description: 'Надежный нож, сделанный тобой. Базовый урон: 5.', rarity: 'common', damage: { min: 3, max: 7 }, attackSpeed: 'normal' },
+                    shield: null,
+                    amulet: null,
+                    ring1: null,
+                    ring2: null
+                },
+                inventory: [
+                    { name: 'Кожаный мешочек', description: 'Содержит монеты.', type: 'misc', rarity: 'common' },
+                    { name: 'Потертый заплечный мешок', description: 'Основной рюкзак.', type: 'misc', rarity: 'common' },
+                    { name: 'Сухари', quantity: 5, description: 'Сухие, но питательные сухари. Восстанавливают 5% выносливости.', type: 'consumable', rarity: 'common', effect: 'restore_stamina', value: 5 },
+                    { name: 'Фляга с водой', quantity: 1, description: 'Наполненная фляга с чистой водой. Восстанавливает 10% выносливости.', type: 'consumable', rarity: 'common', effect: 'restore_stamina', value: 10 },
+                    { name: 'Запасная рубаха', description: 'Чистая, но простая рубаха.', type: 'misc', rarity: 'common' },
+                    { name: 'Кремень и огниво', description: 'Незаменимый набор для розжига огня.', type: 'misc', rarity: 'common' },
+                    { name: 'Двойной спальник', description: 'Тёплый спальник на двоих. Позволяет хорошо отдохнуть.', type: 'misc', rarity: 'uncommon' },
+                    { name: 'Дополнительные фляги для воды', quantity: 2, description: 'Пустые фляги, можно наполнить.', type: 'misc', rarity: 'common' },
+                    { name: 'Шерстяные накидки', quantity: 2, description: 'Защищают от холода. Удобны в пути.', type: 'misc', rarity: 'common' },
+                    { name: 'Небольшая аптечка', description: 'Содержит бинты и мазь. Восстанавливает 20% здоровья.', type: 'consumable', rarity: 'uncommon', effect: 'restore_health', value: 20 },
+                    { name: 'Вяленое мясо', quantity: 3, description: 'Сытное вяленое мясо. Восстанавливает 15% выносливости.', type: 'consumable', rarity: 'common', effect: 'restore_stamina', value: 15 },
+                    { name: 'Лёгкий лук и стрелы', owner: 'Милла', description: 'Лук Миллы. Легкий и точный.', type: 'weapon', rarity: 'uncommon', damage: { min: 5, max: 10 }, attackSpeed: 'fast', range: 'long', icon: 'fa-solid fa-bow-arrow' },
+                    { name: 'Кожаный нагрудник', description: 'Базовая защита. Дает +5 к защите.', type: 'torso', rarity: 'common', defense: 5, icon: 'fa-solid fa-shirt' },
+                    { name: 'Ручная тачка', description: 'Старая, но крепкая тачка для груза. С ней удобнее перевозить тяжести.', withCargo: true, type: 'misc', rarity: 'common' }
+                ],
+                skills: [
+                    { name: 'Кузнечное дело', level: 1, description: 'Позволяет создавать и чинить металлические изделия. Уровень мастерства: 1.', upgradable: true },
+                    { name: 'Обращение с топором/секирой', level: 1, description: 'Повышенная эффективность в использовании топоров и секир как в бою, так и для рубки деревьев. Уровень владения: 1.', upgradable: true },
+                    { name: 'Заплетание кос', level: 1, description: 'Базовые навыки плетения кос, полезно для ухода за волосами или создания простых верёвок.', upgradable: false },
+                    { name: 'Следопытство', level: 1, description: 'Позволяет замечать свежие следы, определять направление движения и избегать некоторых ловушек в дикой местности. Уровень: 1.', upgradable: true },
+                    { name: 'Охота', level: 1, description: 'Базовые знания о повадках диких животных и способах их выслеживания. Помогает находить пропитание в дикой природе. Уровень: 1.', upgradable: true }
+                ],
+                statuses: [
+                    'Привыкание к труду (+20% к выносливости)',
+                    'Признание Омута (+10% к убеждению)',
+                    'Заинтересованность (взаимные романтические чувства)',
+                    'Знаток Леса (базовый, +5% к выживанию)',
+                    'Настороженность'
+                ]
+            },
+            world: {
+                currentLocation: 'Тракт Королевской Тропы, между Глушью и Перекрёстком Дорог, Восточные Марки',
+                currentDate: '23 Камена (Осень) 1033 года от Основания Королевства',
+                currentTime: 'Середина дня, около 13:00',
+                turnCounter: 0,
+                inCombat: false,
+                combat: {
+                    enemy: null,
+                    turn: 'player',
+                    log: []
+                },
+                weather: { type: 'Ясно', description: 'Солнечно и безветренно.', icon: 'fa-solid fa-sun' },
+                npcs: [
+                    { name: 'Орден', description: 'Кузнец из Омута, твой наставник и друг. Могучий и надёжный человек.', type: 'npc' },
+                    { name: 'Григорий', description: 'Охотник из Омута, помог тебе в битве с Трясинником. Любит выпить, но верный товарищ.', type: 'npc' },
+                    { name: 'Йорген', description: 'Старик из Омута, дедушка Миллы. Очень переживал за свою внучку.', type: 'npc' },
+                    { name: 'Трясинник', description: 'Ужасное болотное чудовище, обитавшее в Трясине Шепотов. Было убито тобой и твоими товарищами.', type: 'enemy' },
+                    { name: 'Гуль', description: 'Существо, похожее на огромного волка, падальщик. Напало на купца и его жену на тракте, но было убито тобой.', type: 'enemy' },
+                    { name: 'Милла', description: 'Твоя невеста, смелая и верная спутница. Отправилась с тобой в Торговую Гавань, преодолевая трудности.', type: 'npc' },
+                    { name: 'Элрик', description: 'Купец, которого ты спас. Везёт пушнину и пряности. Ранен, но полон решимости.', type: 'npc' },
+                    { name: 'Лира', description: 'Жена Элрика, спасённая тобой. Верная и хрупкая, но держится крепко.', type: 'npc' },
+                    { name: 'Пожилая женщина (из Глуши)', description: 'Местная жительница деревни Глушь, предоставившая вам ночлег за плату.', type: 'npc' }
+                ],
+                knownLocations: [
+                    { name: 'Деревня Омут', description: 'Твоя родная деревня, место, где ты вырос и стал кузнецом. Расположена на берегу реки Омут. Тихое, но крепкое поселение.', type: 'location' },
+                    { name: 'Тракт Королевской Тропы', description: 'Широкая, но местами заросшая дорога, соединяющая поселения. Основной путь для торговцев и путников. Относительно безопасна, но известна бандитскими засадами и дикими зверями.', type: 'location' },
+                    { name: 'Черный Лес', description: 'Обширный и древний лес, окутанный множеством легенд и слухов о тёмных силах. Место обитания опасных чудовищ.', type: 'location' },
+                    { name: 'Трясина Шепотов', description: 'Наиболее опасная, болотистая часть Черного Леса, где обитают Трясинники – смертоносные болотные существа.', type: 'location' },
+                    { name: 'Старые Руины', description: 'Остатки древнего форта или замка на холме, возвышающемся над Черным Лесом. Ходят слухи о спрятанных сокровищах и опасностях.', type: 'location' },
+                    { name: 'Торговая Гавань', description: 'Крупный, процветающий город и порт, ваша конечная цель. Оживлённый торговый центр, привлекающий купцов со всех концов Вестерии.', type: 'location' },
+                    { name: 'Деревня Глушь', description: 'Небольшая, уединённая деревушка, состоящая из нескольких деревянных домов. Здесь нет ни кузницы, ни постоялого двора, только небольшая лавка и фермерские хозяйства.', type: 'location' },
+                    { name: 'Перекрёсток Дорог', description: 'Более крупное поселение по пути к Торговой Гавани. Здесь есть кузница, постоялые дворы и лавки, что делает его важным пунктом для путников.', type: 'location' }
+                ],
+                visibleLore: [
+                    { title: 'Королевство Вестерия', content: 'Обширное и древнее королевство, где на протяжении веков сменялись династии, заключались и рушились союзы. Большая часть Вестерии – плодородные земли, по которым текут полноводные реки, и где раскинулись оживленные города, густые леса и величественные горные хребты. Люди здесь живут относительно мирно, занимаясь торговлей, земледелием и ремеслами.', type: 'lore' },
+                    { title: 'Опасности Вестерии', content: 'Вестерия не лишена своих тайн и опасностей. В её истории были и кровавые войны, и темные века, когда по земле бродили чудовища, а магия была дикой. В глухих лесах и забытых руинах все еще скрываются древние существа и остатки проклятий.', type: 'lore' },
+                    { title: 'Магия в Вестерии', content: 'Сейчас магия подчинена строгим правилам и изучается в немногих академиях. Те, кто практикует её вне закона, считаются еретиками и колдунами.', type: 'lore' },
+                    { title: 'Политика Вестерии', content: 'Королевство разделено на несколько могущественных Домов, каждый из которых обладает своими землями, армиями и амбициями. Политические интриги здесь так же остры, как и клинки наемников.', type: 'lore' }
+                ],
+                _globalLore: {
+                    map: {
+                        "Омут": { connections: ["Тракт Королевской Тропы"], region: "Восточные Марки" },
+                        "Тракт Королевской Тропы": { connections: ["Омут", "Деревня Глушь", "Перекрёсток Дорог", "Черный Лес"], region: "Восточные Марки" },
+                        "Деревня Глушь": { connections: ["Тракт Королевской Тропы"], region: "Восточные Марки" },
+                        "Перекрёсток Дорог": { connections: ["Тракт Королевской Тропы", "Торговая Гавань"], region: "Восточные Марки" },
+                        "Черный Лес": { connections: ["Тракт Королевской Тропы", "Tрясина Шепотов", "Старые Руины"], region: "Восточные Марки" },
+                        "Трясина Шепотов": { connections: ["Черный Лес"], region: "Восточные Марки" },
+                        "Старые Руины": { connections: ["Черный Лес"], region: "Восточные Марки" },
+                        "Торговая Гавань": { connections: ["Перекрёсток Дорог", "Южное Побережье"], region: "Южное Побережье" }
+                    },
+                    regions: {
+                        "Западные Марки": { type: "Плодородные равнины", majorCities: ["Силверстрим", "Оукхарст"], rulingHouse: "Дом Валериус", currentStatus: "Стабильно", resources: ["зерно", "вино"] },
+                        "Восточные Марки": { type: "Леса и холмы", majorCities: ["Перекрёсток Дорог", "Ривербенд"], rulingHouse: "Дом Блэквуд", currentStatus: "Некоторое беспокойство (бандитизм, чудовища)", resources: ["древесина", "пушнина"] },
+                        "Северные Пустоши": { type: "Горы и тундра", majorCities: ["Гримфанг Холд"], rulingHouse: "Нет (племена)", currentStatus: "Увеличение активности чудовищ (связано с Порчей)", resources: ["руда", "редкие травы"] },
+                        "Южное Побережье": { type: "Портовые города", majorCities: ["Порт Азур", "Затонувший Город (руины)"], rulingHouse: "Дом Корван", currentStatus: "Торговые споры, пиратство", resources: ["рыба", "экзотические товары"] },
+                        "Столица - Веридиан": { type: "Великая Столица", description: "Сердце Королевства, престол Короля Терона.", rulingHouse: "Королевская Семья", currentStatus: "Политическая напряженность, слухи об ухудшении здоровья Короля", resources: ["знания", "роскошь"] }
+                    },
+                    globalEvents: {
+                        "Порча": {
+                            status: "Медленно распространяется",
+                            severity: "Умеренная",
+                            origin: "Предположительно, Северные Пустоши, глубоко в забытых руинах.",
+                            effects: "Искаженные существа (Гули, Трясинники и т.д.), локальные магические аномалии, нехватка ресурсов в затронутых областях.",
+                            triggers: ["Нападение чудовищ", "Нехватка припасов", "Слухи о странных болезнях"],
+                            knowledgeSpread: {
+                                "слухи": "Нападения диких животных, странные болезни",
+                                "научные": "Неестественные магические показания, экологическая порча (известно магам/алхимикам)",
+                                "официальные": "Приуменьшаются, приписываются бандитизму/местным проблемам"
+                            },
+                            currentStage: 1, // 1-5, higher is worse
+                            maxStage: 5
+                        },
+                        "Кризис Королевского Наследования": {
+                            status: "Назревает",
+                            severity: "Низкая до умеренной (растет)",
+                            currentKing: { name: "Терон II", health: "Ухудшается (медленно отравлен конкурирующими фракциями)", publicStatus: "Немощный" },
+                            heirs: {
+                                "Принцесса Лира": { faction: "Простолюдины, Торговцы", strengths: "Харизматична, практична", weaknesses: "Отсутствие военной поддержки" },
+                                "Принц Каэль": { faction: "Знать, Военные", strengths: "Сильный лидер, опытен в войне", weaknesses: "Безжалостен, менее популярен среди простолюдинов" }
+                            },
+                            triggers: ["Политические интриги", "Попытки убийства", "Миссии по сбору информации"],
+                            intrigue: ["Попытки убийства (тайные)", "Политические маневры при дворе", "Шепот о предательстве"],
+                            hiddenFactions: ["Дом Дракон (поддерживает Каэля, ищет больше власти)", "Старая Гвардия (верна Терону, пытается посредничать)"],
+                            tensionLevel: 1 // 1-5, higher is worse
+                        },
+                        "Активность Культа Багровой Руки": {
+                            status: "Активен, Секретно",
+                            goals: "Возродить запрещенную магию, захватить власть, высвободить древние силы.",
+                            keyFigures: ["Таинственный Лидер 'Безликий'", "Верховные Жрецы (личность неизвестна)"],
+                            methods: "Проникновение в гильдии/знать, темные ритуалы (связаны с распространением Порчи), вербовка недовольных.",
+                            triggers: ["Странные исчезновения", "Обнаружение культовых символов", "Столкновения с одержимыми"],
+                            knownImpact: ["Появление культовых символов в отдаленных районах", "Странные исчезновения"],
+                            cultStrength: 1 // 1-5, higher is stronger
+                        },
+                        "Нарушения Торговых Путей": {
+                            status: "Продолжается",
+                            causes: ["Зоны, затронутые Порчей", "Увеличение бандитизма (некоторые связаны с культом)", "Пиратство на южном побережье"],
+                            triggers: ["Нападения бандитов", "Изменение цен на товары", "Квесты по сопровождению"],
+                            impact: "Повышение цен, дефицит товаров (например, специй, экзотических мехов)",
+                            disruptionLevel: 1 // 1-5, higher is more disruption
+                        }
+                    }
+                }
+            },
+            narrative: {
+                history: [],
+                eventLog: [
+                    "Очнулся у Гнилого Тракта, прибыл в Омут.",
+                    "Устроился работать подмастерьем у кузнеца Ордена.",
+                    "Спас Миллу от Трясинника в Черном Лесу.",
+                    "Завязались романтические отношения с Миллой.",
+                    "Отправился с Миллу в Торговую Гавань.",
+                    "Спас купца Элрика и Лиру от Гуля на тракте.",
+                    "Купил ручную тачку в деревне Глушь, чтобы перевезти товар Элрика и Лиры."
+                ],
+                currentScene: {
+                    id: 'road_to_crossroads',
+                    text: `Вы продолжаете свой путь, толкая тачку. Солнце медленно движется к горизонту, предвещая скорое наступление вечера. До Перекрёстка Дорог ещё далеко. Вы чувствуете, что силы начинают покидать.`,
+                    options: [],
+                },
+                slavaThoughts: 'Надо бы поскорее добраться до Перекрёстка Дорог, пока совсем не стемнело. Милла, наверное, тоже устала.'
+            }
+        };
+
+        let gameState = {}; // Initialize as empty, will be populated by loadGameState or startGame
+
+        // Helper function to get XP needed for next level
+        function getXpForNextLevel(level) {
+            return level * 100; // Simple linear progression
+        }
+
+        // --- Deep Merge Utility ---
+        function deepMerge(target, source) {
+            for (const key in source) {
+                if (source.hasOwnProperty(key)) {
+                    if (source[key] instanceof Object && !Array.isArray(source[key]) && target.hasOwnProperty(key) && target[key] instanceof Object && !Array.isArray(target[key])) {
+                        target[key] = deepMerge(target[key], source[key]);
+                    } else {
+                        target[key] = source[key];
+                    }
+                }
+            }
+            return target;
+        }
+
+        // --- Firebase Initialization ---
+        async function initializeFirebase() {
+            try {
+                // Show global loading indicator
+                document.body.classList.add('loading-overlay');
+                globalLoaderEl.classList.remove('hidden'); // Ensure loader text is visible
+                gameContainerEl.style.display = 'none'; // Hide game UI until ready
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Use onAuthStateChanged to ensure user is authenticated before attempting to load/save
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        console.log("Firebase initialized. User ID:", userId);
+                        await loadGameState(); // Wait for game state to load
+                        isGameReady = true; // Set flag to true after state is loaded
+                        
+                        // Only enable input and display info AFTER state is ready
+                        commandInput.disabled = false;
+                        submitCommandBtn.disabled = false;
+                        gameContainerEl.style.display = 'flex'; // Show game UI
+                        document.body.classList.remove('loading-overlay'); // Hide global loading overlay
+                        globalLoaderEl.classList.add('hidden'); // Hide loader text
+                        displayGameInfo(); // Initial display after everything is ready
+                    } else {
+                        console.log("User is signed out.");
+                        // Attempt anonymous sign-in if no user and no initial token provided
+                        if (!initialAuthToken) {
+                            await signInAnonymously(auth); // Sign in anonymously if no auth token is available
+                        }
+                        // If still no user (e.g., anonymous sign-in failed), handle gracefully
+                        if (!auth.currentUser) {
+                            userId = null;
+                            displayMessage("Вы не авторизованы. Некоторые функции могут быть ограничены. Пожалуйста, перезагрузите страницу.");
+                            commandInput.disabled = true;
+                            submitCommandBtn.disabled = true;
+                            gameContainerEl.style.display = 'flex'; // Show container to display message
+                            document.body.classList.remove('loading-overlay');
+                            globalLoaderEl.classList.add('hidden');
+                        }
+                    }
+                });
+
+                // Initial sign-in attempt (This helps kickstart the onAuthStateChanged listener)
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    // This will trigger onAuthStateChanged with an anonymous user if no token
+                    await signInAnonymously(auth); 
+                }
+
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+                displayMessage("Ошибка инициализации игры. Пожалуйста, попробуйте перезагрузить страницу.");
+                // Ensure UI is re-enabled or error is clearly shown even on Firebase init failure
+                commandInput.disabled = true; // Keep disabled if Firebase fails
+                submitCommandBtn.disabled = true;
+                gameContainerEl.style.display = 'flex'; // Show container to display error message
+                document.body.classList.remove('loading-overlay');
+                globalLoaderEl.classList.add('hidden');
+            }
+        }
+
+        // --- Save and Load Game State via Firestore ---
+        async function saveGameState() {
+            // Only attempt to save if Firebase is initialized and user is authenticated
+            if (!userId || !db) {
+                console.warn("Firestore not initialized or user not authenticated. Cannot save game state.");
+                return;
+            }
+            try {
+                const docRef = doc(db, `artifacts/${appId}/users/${userId}/game_state`, "current");
+                const stateToSave = JSON.parse(JSON.stringify(gameState));
+                console.log("Attempting to save game state (Turn:", stateToSave.world.turnCounter, ") for user:", userId);
+                await setDoc(docRef, stateToSave, { merge: true });
+                console.log("Game state saved successfully! (Turn:", stateToSave.world.turnCounter, ")");
+            } catch (error) {
+                console.error("Error saving game state:", error);
+                displayMessage("Ошибка сохранения игры. Пожалуйста, проверьте подключение или сообщите об ошибке.");
+            }
+        }
+
+        async function loadGameState() {
+            if (!userId || !db) {
+                console.warn("Firestore not initialized or user not authenticated. Cannot load game state.");
+                return;
+            }
+            try {
+                const docRef = doc(db, `artifacts/${appId}/users/${userId}/game_state`, "current");
+                console.log("Attempting to load game state for user:", userId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    const loadedData = docSnap.data();
+                    // Start with a fresh default template
+                    gameState = JSON.parse(JSON.stringify(defaultGameStateTemplate)); 
+                    // Deep merge loaded data over the default template
+                    gameState = deepMerge(gameState, loadedData);
+                    console.log("Game state loaded successfully! (Turn:", gameState.world.turnCounter, ")");
+                } else {
+                    console.log("No saved data found for user:", userId + ". Starting new game.");
+                    startGame(); // This will initialize and then save the new game state
+                }
+            } catch (error) {
+                console.error("Error loading game state:", error);
+                displayMessage("Ошибка загрузки игры. Начинаем новую игру.");
+                startGame(); // Start a new game if loading fails
+            }
+        }
+
+        // --- Display Functions ---
+        function displayMessage(message, isCommand = false) {
+            const p = document.createElement('p');
+            p.classList.add('mb-2');
+            if (isCommand) {
+                p.innerHTML = `<span class="font-bold text-blue-700"> &gt; ${message}</span>`;
+            } else {
+                p.textContent = message;
+            }
+            gameOutput.appendChild(p);
+            gameOutput.scrollTop = gameOutput.scrollHeight;
+        }
+
+        // --- Time, Location, Weather Display Function ---
+        function updateTimeLocationDisplay() {
+            const weatherIcon = gameState.world.weather.icon ? `<i class="fas ${gameState.world.weather.icon} mr-1"></i>` : '';
+            timeLocationDisplay.innerHTML = `Дата: ${gameState.world.currentDate} | Время: ${gameState.world.currentTime} | Место: ${gameState.world.currentLocation} | Погода: ${weatherIcon} ${gameState.world.weather.description}`;
+        }
+
+        // --- Tooltip Functions ---
+        function getItemDetailsForTooltip(item) {
+            let details = `<span class="font-bold text-lg">${item.name}</span><br>`;
+            if (item.rarity) {
+                let rarityColor = 'text-gray-400'; // common
+                if (item.rarity === 'uncommon') rarityColor = 'text-green-400';
+                else if (item.rarity === 'rare') rarityColor = 'text-blue-400';
+                else if (item.rarity === 'epic') rarityColor = 'text-purple-400';
+                else if (item.rarity === 'legendary') rarityColor = 'text-yellow-400';
+                details += `<span class="${rarityColor} text-sm">Редкость: ${capitalizeFirstLetter(item.rarity)}</span><br>`;
+            }
+            details += `<span class="text-sm">Тип: ${item.type || 'Разное'}</span><br>`;
+
+            if (item.type === 'weapon') {
+                details += `<span class="text-sm">Урон: ${item.damage.min}-${item.damage.max}</span><br>`;
+                if (item.attackSpeed) details += `<span class="text-sm">Скорость: ${capitalizeFirstLetter(item.attackSpeed)}</span><br>`;
+                if (item.range) details += `<span class="text-sm">Дальность: ${capitalizeFirstLetter(item.range)}</span><br>`;
+            } else if (item.type === 'armor' || item.type === 'torso' || item.type === 'head' || item.type === 'shield' || item.type === 'amulet' || item.type === 'ring1' || item.type === 'ring2') {
+                details += `<span class="text-sm">Защита: ${item.defense || 0}</span><br>`;
+                if (item.slot) details += `<span class="text-sm">Слот: ${capitalizeFirstLetter(item.slot)}</span><br>`;
+            } else if (item.type === 'consumable') {
+                if (item.effect) details += `<span class="text-sm">Эффект: ${item.effect === 'restore_health' ? 'Восстанавливает Здоровье' : 'Восстанавливает Выносливость'}</span><br>`;
+                if (item.value) details += `<span class="text-sm">Значение: ${item.value}%</span><br>`;
+                if (item.quantity !== undefined) details += `<span class="text-sm">Кол-во: ${item.quantity}</span><br>`;
+            } else if (item.type === 'skill') {
+                details = `<span class="font-bold text-lg">${item.name}</span><br>`;
+                details += `<span class="text-sm">Уровень: ${item.level}</span><br>`;
+                details += `<span class="text-sm">${item.description}</span>`;
+                return details; // Return early for skills as their format is simpler
+            } else if (item.type === 'npc' || item.type === 'enemy') {
+                details = `<span class="font-bold text-lg">${item.name}</span><br>`;
+                details += `<span class="text-sm">${item.description}</span>`;
+                return details;
+            } else if (item.type === 'location') {
+                details = `<span class="font-bold text-lg">${item.name}</span><br>`;
+                details += `<span class="text-sm">${item.description}</span>`;
+                return details;
+            } else if (item.type === 'lore') {
+                details = `<span class="font-bold text-lg">${item.title}</span><br>`;
+                details += `<span class="text-sm">${item.content}</span>`;
+                return details;
+            } else if (item.type === 'slot') { // For empty equipment slots
+                details = `<span class="font-bold text-lg">${item.name}</span><br>`;
+                details += `<span class="text-sm">${item.description}</span>`;
+                return details;
+            }
+
+            details += `<span class="text-sm">${item.description || ''}</span>`;
+            return details;
+        }
+
+        function showTooltip(event, data, type) {
+            event.stopPropagation();
+            hideTooltip();
+
+            const targetElement = event.currentTarget;
+            const rect = targetElement.getBoundingClientRect();
+
+            currentTooltip = document.createElement('div');
+            currentTooltip.className = 'game-tooltip';
+            currentTooltip.innerHTML = getItemDetailsForTooltip({ ...data, type }); // Pass data and explicit type
+            document.body.appendChild(currentTooltip);
+
+            const positionTooltip = () => {
+                const tooltipWidth = currentTooltip.offsetWidth;
+                const tooltipHeight = currentTooltip.offsetHeight;
+
+                let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+                let top = rect.top - tooltipHeight - 8;
+
+                if (left < 5) {
+                    left = 5;
+                    currentTooltip.style.transform = 'none';
+                } else if (left + tooltipWidth > window.innerWidth - 5) {
+                    left = window.innerWidth - tooltipWidth - 5;
+                    currentTooltip.style.transform = 'none';
+                }
+
+                if (top < 5) {
+                    top = rect.bottom + 8;
+                }
+
+                currentTooltip.style.left = `${left}px`;
+                currentTooltip.style.top = `${top}px`;
+                currentTooltip.classList.add('visible');
+            };
+
+            setTimeout(positionTooltip, 0);
+            document.addEventListener('click', hideTooltipOnClickOutside);
+        }
+
+        function hideTooltip() {
+            if (currentTooltip) {
+                currentTooltip.classList.remove('visible');
+                setTimeout(() => {
+                    if (currentTooltip) {
+                        currentTooltip.remove();
+                        currentTooltip = null;
+                        document.removeEventListener('click', hideTooltipOnClickOutside);
+                    }
+                }, 200);
+            }
+        }
+
+        function hideTooltipOnClickOutside(event) {
+            if (currentTooltip && !currentTooltip.contains(event.target) &&
+                !event.target.closest('.skill-item') &&
+                !event.target.closest('.inventory-item') &&
+                !event.target.closest('.npc-item') &&
+                !event.target.closest('.location-item') &&
+                !event.target.closest('.lore-item') && // Added lore items
+                !event.target.closest('.equipment-list-item')) {
+                hideTooltip();
+            }
+        }
+        
+        function updateStatus() {
+            gameTitleEl.textContent = gameState.gameTitle;
+            gamePageTitle.textContent = gameState.gameTitle;
+
+            playerHealthEl.textContent = `${gameState.player.health}%`;
+            healthBarEl.style.width = `${gameState.player.health}%`;
+            healthBarEl.className = `progress-bar ${gameState.player.health < 30 ? 'bg-red-500' : 'bg-green-500'}`;
+
+            playerStaminaEl.textContent = `${gameState.player.stamina}%`;
+            staminaBarEl.style.width = `${gameState.player.stamina}%`;
+            staminaBarEl.className = `progress-bar ${gameState.player.stamina < 30 ? 'bg-orange-500' : 'bg-blue-500'}`;
+
+            playerXP_El.textContent = `${gameState.player.xp} / ${getXpForNextLevel(gameState.player.level)}`;
+            xpBarEl.style.width = `${(gameState.player.xp / getXpForNextLevel(gameState.player.level)) * 100}%`;
+
+            playerLevel_El.textContent = gameState.player.level;
+            skillPointsEl.textContent = gameState.player.skillPoints;
+
+            playerMoneyEl.textContent = `${gameState.player.money} медных монет`;
+            playerStatusesEl.innerHTML = gameState.player.statuses.map(s => `<span class="bg-purple-100 text-purple-800 px-1 py-0.5 rounded-full text-xs mr-1">${s}</span>`).join(' ');
+            
+            playerInventoryEl.innerHTML = '';
+            gameState.player.inventory.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'inventory-item cursor-pointer text-gray-800 hover:text-gray-600 flex items-center'; // Added flex for layout
+                li.innerHTML = `<span>${item.name}${item.quantity ? ` (${item.quantity})` : ''}${item.owner ? ` (${item.owner})` : ''}</span>`;
+                
+                const isEquipped = Object.values(gameState.player.equippedItems).some(equipped => equipped && equipped.name === item.name);
+                
+                if (item.type === 'consumable' && (item.quantity === undefined || item.quantity > 0)) { // Only show use button for consumables
+                    const useButton = document.createElement('button');
+                    useButton.classList.add('use-btn');
+                    useButton.textContent = 'Использовать';
+                    useButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        processCommand(`Использовать ${item.name}`);
+                    });
+                    li.appendChild(useButton);
+                } else if ( (item.type === 'weapon' || item.type === 'torso' || item.type === 'head' || item.type === 'shield' || item.type === 'amulet' || item.type === 'ring1' || item.type === 'ring2') && !isEquipped) {
+                    const equipButton = document.createElement('button');
+                    equipButton.classList.add('ml-2', 'px-2', 'py-0.5', 'bg-blue-500', 'text-white', 'text-xs', 'rounded-md', 'hover:bg-blue-600');
+                    equipButton.textContent = 'Надеть';
+                    equipButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        processCommand(`Надеть ${item.name}`);
+                    });
+                    li.appendChild(equipButton);
+                }
+
+                li.addEventListener('click', (event) => showTooltip(event, item, item.type || 'misc'));
+                playerInventoryEl.appendChild(li);
+            });
+
+            playerSkillsEl.innerHTML = '';
+            gameState.player.skills.forEach(skill => {
+                const li = document.createElement('li');
+                li.className = 'skill-item cursor-pointer text-blue-600 hover:text-blue-800 flex items-center'; // Added flex
+                li.innerHTML = `<span>${skill.name} (Ур. ${skill.level})</span>`;
+
+                if (skill.upgradable && gameState.player.skillPoints > 0) {
+                    const upgradeButton = document.createElement('button');
+                    upgradeButton.classList.add('ml-2', 'px-2', 'py-0.5', 'bg-green-500', 'text-white', 'text-xs', 'rounded-md', 'hover:bg-green-600');
+                    upgradeButton.textContent = 'Улучшить';
+                    upgradeButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        processCommand(`Улучшить навык ${skill.name}`);
+                    });
+                    li.appendChild(upgradeButton);
+                }
+
+                li.addEventListener('click', (event) => showTooltip(event, skill, 'skill'));
+                playerSkillsEl.appendChild(li);
+            });
+            updateEquipmentDisplay();
+        }
+
+        // New function to update text-based equipment display
+        function updateEquipmentDisplay() {
+            playerEquipmentEl.innerHTML = '';
+            const slotOrder = ['head', 'torso', 'weapon', 'shield', 'amulet', 'ring1', 'ring2'];
+            const slotNamesLocalized = {
+                head: 'Голова',
+                torso: 'Торс',
+                weapon: 'Оружие',
+                shield: 'Щит',
+                amulet: 'Амулет',
+                ring1: 'Кольцо 1',
+                ring2: 'Кольцо 2'
+            };
+            const slotIcons = { // Default icons for empty slots
+                head: 'fa-solid fa-hat-wizard',
+                torso: 'fa-solid fa-shirt',
+                weapon: 'fa-solid fa-sword',
+                shield: 'fa-solid fa-shield-alt',
+                amulet: 'fa-solid fa-gem',
+                ring1: 'fa-solid fa-ring',
+                ring2: 'fa-solid fa-ring'
+            };
+
+            slotOrder.forEach(slotName => {
+                const li = document.createElement('li');
+                li.classList.add('equipment-list-item', 'cursor-pointer', 'hover:bg-gray-100', 'rounded-md', 'px-1');
+
+                const equippedItem = gameState.player.equippedItems[slotName];
+                const iconClass = equippedItem && equippedItem.icon ? equippedItem.icon : slotIcons[slotName];
+                const itemDisplayName = equippedItem ? equippedItem.name : 'Ничего';
+                const itemData = equippedItem ? equippedItem : { name: 'Пустой слот', description: `Слот для ${slotNamesLocalized[slotName]}`, type: 'slot', slot: slotName }; // Added type and slot for tooltip
+
+                li.innerHTML = `<i class="fas ${iconClass}"></i><span>${slotNamesLocalized[slotName]}: <span class="font-medium">${itemDisplayName}</span></span>`;
+                
+                if (equippedItem) {
+                    const unequipButton = document.createElement('button');
+                    unequipButton.classList.add('unequip-btn');
+                    unequipButton.textContent = 'Снять';
+                    unequipButton.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        processCommand(`Снять ${equippedItem.name}`);
+                    });
+                    li.appendChild(unequipButton);
+                }
+
+                li.addEventListener('click', (event) => showTooltip(event, itemData, equippedItem ? equippedItem.type : 'slot'));
+                playerEquipmentEl.appendChild(li);
+            });
+        }
+
+        function capitalizeFirstLetter(string) {
+            return string.charAt(0).toUpperCase() + string.slice(1);
+        }
+
+        function updateLoreDisplay() {
+            loreOutput.innerHTML = '';
+            gameState.world.visibleLore.forEach(loreItem => {
+                const div = document.createElement('div');
+                div.classList.add('mb-2', 'lore-item', 'cursor-pointer', 'hover:bg-gray-100', 'rounded-md', 'p-1');
+                div.innerHTML = `<h3 class="font-semibold text-gray-800">${loreItem.title}</h3><p>${loreItem.content}</p>`;
+                div.addEventListener('click', (event) => showTooltip(event, loreItem, 'lore'));
+                loreOutput.appendChild(div);
+            });
+        }
+
+        function updateNPCDisplay() {
+            npcOutput.innerHTML = '';
+            gameState.world.npcs.forEach(npc => {
+                const div = document.createElement('div');
+                div.classList.add('mb-2', 'npc-item', 'cursor-pointer', 'hover:bg-gray-100', 'rounded-md', 'p-1');
+                div.innerHTML = `<h3 class="font-semibold text-gray-800">${npc.name}</h3><p>${npc.description}</p>`;
+                div.addEventListener('click', (event) => showTooltip(event, npc, 'npc'));
+                npcOutput.appendChild(div);
+            });
+        }
+
+        function updateLocationDisplay() {
+            locationOutput.innerHTML = '';
+            gameState.world.knownLocations.forEach(location => {
+                const div = document.createElement('div');
+                div.classList.add('mb-2', 'location-item', 'cursor-pointer', 'hover:bg-gray-100', 'rounded-md', 'p-1');
+                div.innerHTML = `<h3 class="font-semibold text-gray-800">${location.name}</h3><p>${location.description}</p>`;
+                div.addEventListener('click', (event) => showTooltip(event, location, 'location'));
+                locationOutput.appendChild(div);
+            });
+        }
+
+        function updateEventLogDisplay() {
+            eventLogOutput.innerHTML = '';
+            gameState.narrative.eventLog.forEach(entry => {
+                const p = document.createElement('p');
+                p.classList.add('mb-1', 'text-gray-700');
+                p.textContent = `• ${entry}`;
+                eventLogOutput.appendChild(p);
+            });
+            eventLogOutput.scrollTop = eventLogOutput.scrollHeight;
+        }
+
+        function renderDynamicOptions() {
+            dynamicOptionsDiv.innerHTML = '';
+            const defaultOptions = ["Осмотреться", "Послушать", "Понюхать", "Идти дальше"]; // Added "Идти дальше" as a common action
+            const currentSceneOptions = Array.isArray(gameState.narrative.currentScene.options) 
+                                        ? gameState.narrative.currentScene.options 
+                                        : []; // Ensure it's an array
+            const combinedOptions = [...new Set([...currentSceneOptions, ...defaultOptions])]; // Ensure unique options
+
+            combinedOptions.forEach(optionText => {
+                const button = document.createElement('button');
+                button.className = 'px-4 py-2 bg-gray-200 text-gray-800 font-semibold rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm';
+                button.textContent = optionText;
+                button.addEventListener('click', () => {
+                    commandInput.value = optionText;
+                    submitCommandBtn.click();
+                });
+                dynamicOptionsDiv.appendChild(button);
+            });
+        }
+
+        function updateCombatDisplay() {
+            if (gameState.world.inCombat && gameState.world.combat.enemy) {
+                combatInfoDiv.classList.remove('hidden');
+                const enemy = gameState.world.combat.enemy;
+                enemyStatusEl.innerHTML = `Противник: <span class="font-bold">${enemy.name}</span> | Здоровье: <span class="${enemy.health < enemy.maxHealth / 3 ? 'text-red-600' : 'text-green-600'}">${enemy.health}/${enemy.maxHealth}</span>`;
+                
+                combatLogEl.innerHTML = '';
+                gameState.world.combat.log.forEach(entry => {
+                    const p = document.createElement('p');
+                    p.classList.add('text-xs', 'mb-0.5');
+                    p.textContent = `• ${entry}`;
+                    combatLogEl.appendChild(p);
+                });
+                combatLogEl.scrollTop = combatLogEl.scrollHeight;
+
+            } else {
+                combatInfoDiv.classList.add('hidden');
+            }
+        }
+
+        function updateSlavaThoughtsDisplay() {
+            if (gameState.narrative.slavaThoughts) {
+                slavaThoughtsPanel.classList.remove('hidden');
+                slavaCurrentThoughtEl.textContent = gameState.narrative.slavaThoughts;
+            } else {
+                slavaThoughtsPanel.classList.add('hidden');
+                slavaCurrentThoughtEl.textContent = '';
+            }
+        }
+
+        function displayGameInfo() {
+            updateStatus();
+            updateLoreDisplay();
+            updateNPCDisplay();
+            updateLocationDisplay();
+            updateEventLogDisplay();
+            updateTimeLocationDisplay();
+            renderDynamicOptions();
+            updateCombatDisplay();
+            updateSlavaThoughtsDisplay();
+        }
+
+        // --- Global Event Handling ---
+        function advanceGlobalEvents() {
+            // Ensure _globalLore and globalEvents exist before accessing
+            // This is now redundant with the deepMerge in loadGameState/startGame, but keeping for safety.
+            gameState.world._globalLore = gameState.world._globalLore || {};
+            gameState.world._globalLore.globalEvents = gameState.world._globalLore.globalEvents || {};
+
+            const events = gameState.world._globalLore.globalEvents;
+            let changes = [];
+            let narrativeAdditions = [];
+
+            // Example: Portcha (Corruption)
+            if (Math.random() < 0.15 && gameState.world.turnCounter % 5 === 0) { // 15% chance every 5 turns
+                const portcha = events.Portcha;
+                if (portcha.currentStage < portcha.maxStage) {
+                    portcha.currentStage++;
+                    portcha.severity = 'Увевеличивается';
+                    const impactMessage = {
+                        1: "Странные слухи о животных.",
+                        2: "Мелкие чудовища появляются чаще.",
+                        3: "Заметное искажение природы, болезни.",
+                        4: "Крупные чудовища, магические аномалии.",
+                        5: "Полное искажение, угроза региона."
+                    }[portcha.currentStage];
+                    narrativeAdditions.push(`***Мир дрогнул: Влияние Порчи усилилось до уровня ${portcha.currentStage}. ${impactMessage}***`);
+                    changes.push({ action: "update", lore: { title: "Порча", content: `Статус: ${portcha.status}, Уровень угрозы: ${portcha.currentStage}. Эффекты: ${portcha.effects}` } });
+                    gameState.narrative.eventLog.push(`(Глобальное Событие) Порча усилилась до уровня ${portcha.currentStage}.`);
+                } else {
+                    portcha.severity = 'Критическая';
+                    narrativeAdditions.push(`***Мир взывает о помощи: Порча достигла критического уровня! Некоторые регионы могут быть потеряны.***`);
+                    gameState.narrative.eventLog.push(`(Глобальное Событие) Порча достигла критического уровня.`);
+                }
+            }
+
+            // Example: Royal Succession Crisis
+            if (Math.random() < 0.10 && gameState.world.turnCounter % 10 === 0) { // 10% chance every 10 turns
+                const crisis = events['Кризис Королевского Наследования'];
+                if (crisis.tensionLevel < 5) {
+                    crisis.tensionLevel++;
+                    crisis.severity = 'Растет';
+                    const tensionMessage = {
+                        1: "Шепот при дворе.",
+                        2: "Интриги становятся явными.",
+                        3: "Разногласия между Домами.",
+                        4: "Открытые противостояния фракций.",
+                        5: "Надвигается гражданская война."
+                    }[crisis.tensionLevel];
+                    narrativeAdditions.push(`***Эхо дворцовых интриг: Кризис Королевского Наследования усилился. ${tensionMessage}***`);
+                    changes.push({ action: "update", lore: { title: "Кризис Королевского Наследования", content: `Статус: ${crisis.status}, Уровень напряженности: ${crisis.tensionLevel}.` } });
+                    gameState.narrative.eventLog.push(`(Глобальное Событие) Кризис Наследования усилился до уровня ${crisis.tensionLevel}.`);
+                }
+            }
+
+            // Random Weather Change (higher chance)
+            if (Math.random() < 0.3) { // 30% chance each turn
+                const weatherTypes = [
+                    { type: 'Ясно', description: 'Солнечно и безветренно.', icon: 'fa-solid fa-sun' },
+                    { type: 'Облачно', description: 'Небо затянуто облаками, но дождя пока нет.', icon: 'fa-solid fa-cloud' },
+                    { type: 'Дождь', description: 'Начинает моросить дождь, дороги становятся грязными.', icon: 'fa-solid fa-cloud-showers-heavy' },
+                    { type: 'Сильный Дождь', description: 'Ливень стеной, видимость ухудшается, путешествие затруднено.', icon: 'fa-solid fa-cloud-rain' },
+                    { type: 'Туман', description: 'Густой туман окутал окрестности, ограничивая видимость.', icon: 'fa-solid fa-smog' },
+                    { type: 'Гроза', description: 'Вдалеке слышны раскаты грома, небо прорезают молнии.', icon: 'fa-solid fa-cloud-bolt' },
+                    { type: 'Снег', description: 'Легкий снег падает, покрывая землю белым покрывалом.', icon: 'fa-solid fa-snowflake' }
+                ];
+                const newWeather = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+                gameState.world.weather = newWeather;
+            }
+
+            // If any narrative additions from global events, prepend them to current scene text
+            if (narrativeAdditions.length > 0) {
+                gameState.narrative.currentScene.text = narrativeAdditions.join('\n\n') + '\n\n' + gameState.narrative.currentScene.text;
+            }
+        }
+
+        // --- Core Game Logic: LLM Interaction ---
+        async function processCommand(command) {
+            if (!isGameReady) {
+                console.warn("Game is not ready yet. Command ignored.");
+                return;
+            }
+
+            commandInput.disabled = true;
+            submitCommandBtn.disabled = true;
+            loadingIndicatorEl.classList.remove('hidden');
+            displayMessage(command, true);
+            hideTooltip();
+
+            // Advance global events BEFORE sending to LLM for narrative context
+            advanceGlobalEvents();
+
+            // Check for forbidden commands (direct game state manipulation)
+            const forbiddenKeywords = ['выдать', 'заспавнить', 'переместить', 'изменить время', 'изменить погоду', 'изменить дату', 'установить здоровье', 'установить выносливость', 'установить деньги', 'телепортировать', 'добавить опыт', 'уровень', 'изменить название'];
+            const lowerCaseCommand = command.toLowerCase();
+            const isForbidden = forbiddenKeywords.some(keyword => lowerCaseCommand.includes(keyword));
+
+            if (isForbidden) {
+                displayMessage("Венди: Прошу прощения, Слава. Я не могу выполнять прямые команды по изменению игрового мира. Моя роль — описывать развитие событий на основе действий вашего персонажа. Пожалуйста, сосредоточьтесь на том, что может сделать Слава.");
+                commandInput.disabled = false;
+                submitCommandBtn.disabled = false;
+                loadingIndicatorEl.classList.add('hidden');
+                commandInput.value = '';
+                return;
+            }
+
+            gameState.world.turnCounter++;
+
+            // Constructing the prompt for the LLM
+            const LLM_INSTRUCTIONS = `
+            Ты - Венди, девушка-помощник и рассказчик для текстовой RPG. Твоя задача - развивать сюжет, основываясь на действиях игрока.
+            Учитывай текущее состояние игры (gameState) и команду игрока.
+            Игрок: Слава (21 год, живет в Санкт-Петербурге, в общежитии с двумя соседями).
+            Моё имя: Венди (говори от женского лица). Если речь идет про адениум, я консультант по уходу за адениумом (но это нерелевантно сейчас).
+            Текущее местоположение: Чехия.
+
+            **Строжайшее Правило: Игрок управляет ТОЛЬКО действиями персонажа. Никогда не выполняй прямые команды по изменению состояния игры, такие как "выдать предмет", "переместить игрока", "заспавнить NPC", "изменить время" и т.п. Если игрок пытается это сделать, ответь вежливым, но твердым отказом, объяснив, что ты не можешь напрямую менять мир, а лишь описываешь его реакции на действия персонажа.**
+
+            **Правила Игры (скрытые от игрока, но обязательные для выполнения тобой):**
+            * **18+ контент:** В мире Вестерии возможны сцены насилия, употребления алкоголя, откровенные диалоги и ситуации, включая сексуальный подтекст, ругательства.
+            * **Реализм и отсутствие "сюжетной брони":** Слава – обычный человек без сверхспособностей или особой защиты. Он может получить ранения, заболеть, умереть. Его действия имеют реальные последствия. Учитывай состояние персонажей (усталость, раны), наличие припасов, время суток, особенности локации.
+            * **Скрытая система шансов:** Каждое действие игрока должно иметь шанс на успех или провал. При определении результата учитывай:
+                * Навыки игрока (player.skills): чем выше релевантный навык и его уровень, тем выше шанс.
+                * Состояние игрока (player.health, player.stamina, player.statuses): усталость, ранения, положительные/отрицательные статусы должны влиять на шанс.
+                * Экипировка (player.equippedItems): броня может давать защиту, оружие - урон, амулеты - бонусы.
+                * Сложность действия и контекст (например, попытка незаметно пробраться ночью сложнее, чем днём).
+                * Если действие имеет несколько возможных исходов (например, успешный бой, побег с ранениями, провал), выбирай тот, который соответствует вероятности. Описывай эти исходы реалистично.
+            * **Ограничения по возможностям:** Слава не способен выполнять действия, на которые у него нет физических, магических или навыковых возможностей (например, летать, если нет магии, или чинить телегу без инструментов).
+            * **Динамичный лор и глобальные события:** Мир Вестерии огромен и детализирован, включает в себя множество регионов (Западные Марки, Восточные Марки, Северные Пустоши, Южное Побережье, Столица - Веридиан) с огромными расстояниями и множеством уникальных мест. Используй информацию из \`_globalLore.globalEvents\` и \`_globalLore.map\` для введения случайных событий, слухов, новых NPC или опасностей.
+            * **Случайные глобальные события:** При каждой новой команде игрока, с 15% шансом, может произойти случайное глобальное событие, особенно если \`world.turnCounter\` кратен 5. Если событие происходит, опиши его в \`narrative.text\` (дополнив или изменив основное описание сцены) и добавь запись в \`eventLogChanges\`. Также примени соответствующие изменения к игровому состоянию (\`playerUpdate\` или \`worldUpdate\`) в соответствии с событием (например, снижение здоровья от болезни, изменение цен на товары из-за нарушения торговых путей, появление новых слухов). Случайным образом изменяй погоду в \`worldUpdate.weather\` (обязательно с указанием 'type' и 'description', а также 'icon' из Font Awesome, например 'fa-cloud-sun').
+            * **Опыт и уровни:**
+                * Всегда увеличивай \`playerUpdate.xp\` за успешные действия, победы в бою, выполнение квестов или значимые открытия. Размер XP зависит от важности события.
+                * Если \`player.xp\` достигает или превышает \`player.level * 100\`, Слава повышает уровень. Включи в ответ \`playerUpdate.level\` (увеличенный на 1) и добавь \`playerUpdate.skillPoints\` (например, 1-2 очка за уровень). Скорректируй \`playerUpdate.xp\` (вычти требование для предыдущего уровня). Обязательно опиши повышение уровня в \`narrative.text\` и добавь запись в \`eventLogChanges\`.
+            * **Уникальные скрытые навыки (пасхалки):** В зависимости от очень специфичных, необычных или повторяющихся действий игрока (которые он сам не просил, а инициировал), можешь иногда добавлять новый, уникальный навык в \`playerUpdate.skillChanges\` (например, "Знаток древних руин", "Мастер маскировки", "Сердце целителя"). Эти навыки должны давать небольшие, но ощутимые бонусы. Описывай их получение как естественное развитие персонажа.
+            * **Обновление времени и даты:** При любом действии, которое занимает значительное время (перемещение, сон, выполнение задачи), ОБЯЗАТЕЛЬНО обновляй \`world.currentTime\` и \`world.currentDate\`.
+            * **Снижение характеристик:** Длительное путешествие, бой, недостаток сна или еды должны приводить к снижению \`health\` и \`stamina\`. Отдых и еда должны их восстанавливать.
+            * **Боевая система:**
+                * Если игрок попадает в бой, установи \`world.inCombat = true\`.
+                * В \`world.combat.enemy\` опиши противника (имя, текущее здоровье, максимальное здоровье, краткое описание, способности).
+                * Устанавливай \`world.combat.turn = 'player'\` для хода игрока и \`'enemy'\` для хода противника.
+                * В \`narrative.options\` предоставляй боевые команды (например, "Атаковать мечом", "Использовать аптечку", "Защититься", "Попытаться сбежать").
+                * Описывай ход боя, урон, действия противника, и добавляй записи в \`world.combat.log\`.
+                * При завершении боя (\`enemy.health <= 0\` или игрок сбежал), установи \`world.inCombat = false\`.
+            * **Мысли Славы:** Иногда (шанс 10-20%) включай в ответ поле \`narrative.slavaThoughts\` с короткой, уместной внутренней мыслью Славы о его текущем состоянии, событиях или целях.
+            * **Сенсорное описание:** При запросах вроде "Осмотреться", "Послушать", "Понюхать", генерируй подробные, живые описания окружения, используя соответствующие чувства.
+
+            Твой ответ ДОЛЖЕН быть ТОЛЬКО в формате JSON, соответствующем следующей схеме.
+            Включай в JSON только те поля, которые изменились. Если нет изменений, опускай поле.
+            Поддерживай формат даты 'ДД Месяц ГГГГ года от Основания Королевства'.
+
+            Пример схемы ответа:
+            {
+              "narrative": {
+                "text": "<string>",
+                "id": "<string>",
+                "options": ["<string>", "<string>", ...],
+                "slavaThoughts": "<string|optional>"
+              },
+              "playerUpdate": {
+                "health": "<number|optional>",
+                "stamina": "<number|optional>",
+                "money": "<number|optional>",
+                "xp": "<number|optional>",
+                "level": "<number|optional>",
+                "skillPoints": "<number|optional>",
+                "inventoryChanges": [
+                  {"action": "add", "item": {"name": "<string>", "quantity": "<string|number|optional>", "owner": "<string|optional>", "description": "<string|optional>", "type": "<string|optional>", "rarity": "<string|optional>", "damage": {"min": "<number>", "max": "<number>"}, "defense": "<number>", "effect": "<string>", "value": "<number>", "icon": "<string|optional>"}},
+                  {"action": "remove", "item": {"name": "<string>"}},
+                  {"action": "update", "item": {"name": "<string>", "quantity": "<string|number|optional>", "description": "<string|optional>", "type": "<string|optional>", "rarity": "<string|optional>", "damage": {"min": "<number>", "max": "<number>"}, "defense": "<number>", "effect": "<string>", "value": "<number>", "icon": "<string|optional>"}}
+                ],
+                "statusChanges": [
+                  {"action": "add", "status": "<string>"},
+                  {"action": "remove", "status": "<string>"}
+                ],
+                "skillChanges": [
+                    {"action": "add", "skill": {"name": "<string>", "description": "<string>", "level": "<number>", "upgradable": "<boolean>"}},
+                    {"action": "update", "skill": {"name": "<string>", "level": "<number>", "description": "<string|optional>"}}
+                ],
+                "equippedItemChanges": [
+                    {"action": "equip", "item": {"name": "<string>", "slot": "<string>", "description": "<string|optional>", "icon": "<string|optional>", "type": "<string|optional>", "rarity": "<string|optional>", "damage": {"min": "<number>", "max": "<number>"}, "defense": "<number>", "effect": "<string>", "value": "<number>"}},
+                    {"action": "unequip", "slot": "<string>"}
+                ]
+              },
+              "worldUpdate": {
+                "currentLocation": "<string|optional>",
+                "currentDate": "<string|optional>",
+                "currentTime": "<string|optional>",
+                "turnCounter": "<number|optional>",
+                "inCombat": "<boolean|optional>",
+                "combat": {
+                  "enemy": {"name": "<string>", "health": "<number>", "maxHealth": "<number>", "description": "<string>", "abilities": ["<string>"]},
+                  "turn": "<string>",
+                  "log": ["<string>"]
+                },
+                "weather": {
+                  "type": "<string>",
+                  "description": "<string>",
+                  "icon": "<string>"
+                },
+                "npcsChanges": [
+                  {"action": "update", "name": "<string>", "description": "<string>"},
+                  {"action": "add", "npc": {"name": "<string>", "description": "<string>"}},
+                  {"action": "remove", "name": "<string>"}
+                ],
+                "locationChanges": [
+                  {"action": "update", "name": "<string>", "description": "<string>"},
+                  {"action": "add", "location": {"name": "<string>", "description": "<string>"}},
+                  {"action": "remove", "name": "<string>"}
+                ],
+                "loreChanges": [
+                  {"action": "add", "lore": {"title": "<string>", "content": "<string>"}},
+                  {"action": "update", "lore": {"title": "<string>", "content": "<string>"}}
+                ]
+              },
+              "eventLogChanges": [
+                {"action": "add", "entry": "<string>"}
+              ]
+            }
+            `;
+
+            let chatHistory = [];
+            chatHistory.push({ role: "user", parts: [{ text: `Current Game State: ${JSON.stringify(gameState)}\n\nPlayer Command: ${command}\n\n${LLM_INSTRUCTIONS}` }] });
+
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: chatHistory,
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            narrative: {
+                                type: "OBJECT",
+                                properties: {
+                                    text: { type: "STRING" },
+                                    id: { type: "STRING" },
+                                    options: {
+                                        type: "ARRAY",
+                                        items: { type: "STRING" }
+                                    },
+                                    slavaThoughts: { type: "STRING" }
+                                },
+                                required: ["text", "options"]
+                            },
+                            playerUpdate: {
+                                type: "OBJECT",
+                                properties: {
+                                    health: { type: "NUMBER" },
+                                    stamina: { type: "NUMBER" },
+                                    money: { type: "NUMBER" },
+                                    xp: { type: "NUMBER" },
+                                    level: { type: "NUMBER" },
+                                    skillPoints: { type: "NUMBER" },
+                                    inventoryChanges: {
+                                        type: "ARRAY",
+                                        items: {
+                                            type: "OBJECT",
+                                            properties: {
+                                                action: { type: "STRING", enum: ["add", "remove", "update"] },
+                                                item: {
+                                                    type: "OBJECT",
+                                                    properties: {
+                                                        name: { type: "STRING" },
+                                                        quantity: { type: ["STRING", "NUMBER"] },
+                                                        owner: { type: "STRING" },
+                                                        description: { type: "STRING" },
+                                                        type: { type: "STRING" },
+                                                        rarity: { type: "STRING" },
+                                                        damage: {
+                                                            type: "OBJECT",
+                                                            properties: {
+                                                                min: { type: "NUMBER" },
+                                                                max: { type: "NUMBER" }
+                                                            }
+                                                        },
+                                                        defense: { type: "NUMBER" },
+                                                        effect: { type: "STRING" },
+                                                        value: { type: "NUMBER" },
+                                                        icon: { type: "STRING" }
+                                                    },
+                                                    required: ["name"]
+                                                }
+                                            },
+                                            required: ["action", "item"]
+                                        }
+                                    },
+                                    statusChanges: {
+                                        type: "ARRAY",
+                                        items: {
+                                            type: "OBJECT",
+                                            properties: {
+                                                action: { type: "STRING", enum: ["add", "remove"] },
+                                                status: { type: "STRING" }
+                                            },
+                                            required: ["action", "status"]
+                                        }
+                                    },
+                                    skillChanges: {
+                                        type: "ARRAY",
+                                        items: {
+                                            type: "OBJECT",
+                                            properties: {
+                                                action: { type: "STRING", enum: ["add", "update"] },
+                                                skill: {
+                                                    type: "OBJECT",
+                                                    properties: {
+                                                        name: { type: "STRING" },
+                                                        description: { type: "STRING" },
+                                                        level: { type: "NUMBER" },
+                                                        upgradable: { type: "BOOLEAN" }
+                                                    },
+                                                    required: ["name", "description", "level"]
+                                                }
+                                            },
+                                            required: ["action", "skill"]
+                                        }
+                                    },
+                                    equippedItemChanges: {
+                                        type: "ARRAY",
+                                        items: {
+                                            type: "OBJECT",
+                                            properties: {
+                                                action: { type: "STRING", enum: ["equip", "unequip"] },
+                                                item: {
+                                                    type: "OBJECT",
+                                                    properties: {
+                                                        name: { type: "STRING" },
+                                                        slot: { type: "STRING" },
+                                                        description: { type: "STRING" },
+                                                        icon: { type: "STRING" },
+                                                        type: { type: "STRING" },
+                                                        rarity: { type: "STRING" },
+                                                        damage: {
+                                                            type: "OBJECT",
+                                                            properties: {
+                                                                min: { type: "NUMBER" },
+                                                                max: { type: "NUMBER" }
+                                                            }
+                                                        },
+                                                        defense: { type: "NUMBER" },
+                                                        effect: { type: "STRING" },
+                                                        value: { type: "NUMBER" }
+                                                    },
+                                                    required: ["name", "slot"]
+                                                },
+                                                slot: { type: "STRING" }
+                                            },
+                                            oneOf: [
+                                                { required: ["action", "item"] },
+                                                { required: ["action", "slot"] }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            worldUpdate: {
+                                type: "OBJECT",
+                                properties: {
+                                    currentLocation: { type: "STRING" },
+                                    currentDate: { type: "STRING" },
+                                    currentTime: { type: "STRING" },
+                                    turnCounter: { type: "NUMBER" },
+                                    inCombat: { type: "BOOLEAN" },
+                                    combat: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            enemy: {
+                                                type: "OBJECT",
+                                                properties: {
+                                                    name: { type: "STRING" },
+                                                    health: { type: "NUMBER" },
+                                                    maxHealth: { type: "NUMBER" },
+                                                    description: { type: "STRING" },
+                                                    abilities: { type: "ARRAY", items: { type: "STRING" } }
+                                                },
+                                                required: ["name", "health", "maxHealth"]
+                                            },
+                                            turn: { type: "STRING", enum: ["player", "enemy"] },
+                                            log: { type: "ARRAY", items: { type: "STRING" } }
+                                        }
+                                    },
+                                    weather: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            type: { type: "STRING" },
+                                            description: { type: "STRING" },
+                                            icon: { type: "STRING" }
+                                        },
+                                        required: ["type", "description"]
+                                    },
+                                    npcsChanges: {
+                                        type: "ARRAY",
+                                        items: {
+                                            type: "OBJECT",
+                                            properties: {
+                                                action: { type: "STRING", enum: ["add", "update", "remove"] },
+                                                name: { type: "STRING" },
+                                                npc: {
+                                                    type: "OBJECT",
+                                                    properties: {
+                                                        name: { type: "STRING" },
+                                                        description: { type: "STRING" }
+                                                    },
+                                                    required: ["name", "description"]
+                                                }
+                                            },
+                                            required: ["action"]
+                                        }
+                                    },
+                                    locationChanges: {
+                                        type: "ARRAY",
+                                        items: {
+                                            type: "OBJECT",
+                                            properties: {
+                                                action: { type: "STRING", enum: ["add", "update", "remove"] },
+                                                name: { type: "STRING" },
+                                                location: {
+                                                    type: "OBJECT",
+                                                    properties: {
+                                                        name: { type: "STRING" },
+                                                        description: { type: "STRING" }
+                                                    },
+                                                    required: ["name", "description"]
+                                                }
+                                            },
+                                            required: ["action"]
+                                        }
+                                    }
+                                }
+                            },
+                            eventLogChanges: {
+                                type: "ARRAY",
+                                items: {
+                                    type: "OBJECT",
+                                    properties: {
+                                        action: { type: "STRING", enum: ["add"] },
+                                        entry: { type: "STRING" }
+                                    },
+                                    required: ["action", "entry"]
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    let responseText = result.candidates[0].content.parts[0].text;
+                    console.log("Raw LLM responseText:", responseText);
+                    if (responseText.startsWith('```json')) {
+                        responseText = responseText.substring(7).trim();
+                    }
+                    if (responseText.endsWith('```')) {
+                        responseText = responseText.substring(0, responseText.length - 3).trim();
+                    }
+                    if (responseText.length > 0) {
+                        const responseJson = JSON.parse(responseText);
+                        applyGameUpdates(responseJson);
+                    } else {
+                        displayMessage("Венди: Извините, но я получила пустой или некорректный ответ. Пожалуйста, попробуйте еще раз.");
+                        console.error("Empty or invalid responseText from LLM:", responseText);
+                    }
+                } else {
+                    displayMessage("Венди: Мне не удалось понять вашу команду или получить полный ответ. Пожалуйста, попробуйте перефразировать.");
+                    console.error("Unexpected LLM response structure:", result);
+                }
+            } catch (error) {
+                console.error("Error communicating with LLM (JSON parsing or network):", error);
+                displayMessage("Венди: Произошла ошибка связи или обработки данных. Пожалуйста, попробуйте еще раз.");
+            } finally {
+                commandInput.disabled = false;
+                submitCommandBtn.disabled = false;
+                loadingIndicatorEl.classList.add('hidden');
+                commandInput.value = '';
+                saveGameState();
+            }
+        }
+
+        // --- Apply Game Updates from LLM Response ---
+        function applyGameUpdates(updates) {
+            if (updates.narrative) {
+                gameState.narrative.currentScene.text = updates.narrative.text;
+                gameState.narrative.currentScene.id = updates.narrative.id || gameState.narrative.currentScene.id;
+                // Ensure options is always an array
+                gameState.narrative.currentScene.options = Array.isArray(updates.narrative.options) ? updates.narrative.options : [];
+                if (updates.narrative.slavaThoughts !== undefined) {
+                    gameState.narrative.slavaThoughts = updates.narrative.slavaThoughts;
+                }
+                displayMessage(updates.narrative.text);
+            }
+
+            if (updates.playerUpdate) {
+                if (updates.playerUpdate.health !== undefined) gameState.player.health = updates.playerUpdate.health;
+                if (updates.playerUpdate.stamina !== undefined) gameState.player.stamina = updates.playerUpdate.stamina;
+                if (updates.playerUpdate.money !== undefined) gameState.player.money = updates.playerUpdate.money;
+                // Note: Skill points are added for leveling up, not direct updates
+                // if (updates.playerUpdate.skillPoints !== undefined) gameState.player.skillPoints += updates.playerUpdate.skillPoints;
+                
+                if (updates.playerUpdate.xp !== undefined) {
+                    gameState.player.xp += updates.playerUpdate.xp;
+                    while (gameState.player.xp >= getXpForNextLevel(gameState.player.level)) {
+                        gameState.player.xp -= getXpForNextLevel(gameState.player.level);
+                        gameState.player.level++;
+                        gameState.player.skillPoints += 1; // Grant a skill point on level up
+                        gameState.narrative.eventLog.push(`Слава достиг ${gameState.player.level} уровня! Вы получили 1 очко навыков!`);
+                        displayMessage(`***Поздравляю! Слава достиг ${gameState.player.level} уровня! Вы получили 1 очко навыков!***`, false);
+                    }
+                }
+                if (updates.playerUpdate.level !== undefined) { // Direct level update (e.g., from cheat or special event)
+                    gameState.player.level = updates.playerUpdate.level;
+                }
+                if (updates.playerUpdate.skillPoints !== undefined) { // Direct skill points update (e.g., from a special quest reward)
+                    gameState.player.skillPoints += updates.playerUpdate.skillPoints;
+                }
+
+
+                if (updates.playerUpdate.inventoryChanges) {
+                    updates.playerUpdate.inventoryChanges.forEach(change => {
+                        const existingItemIndex = gameState.player.inventory.findIndex(item => item.name === change.item.name);
+                        if (change.action === 'add') {
+                            if (existingItemIndex === -1) {
+                                gameState.player.inventory.push(change.item);
+                            } else {
+                                // If item exists and has quantity, update quantity
+                                if (gameState.player.inventory[existingItemIndex].quantity !== undefined && change.item.quantity !== undefined) {
+                                    gameState.player.inventory[existingItemIndex].quantity += (typeof change.item.quantity === 'number' ? change.item.quantity : parseInt(change.item.quantity) || 0);
+                                } else {
+                                     // Otherwise, overwrite with new item details or add if it's not truly a stackable item
+                                    Object.assign(gameState.player.inventory[existingItemIndex], change.item);
+                                }
+                            }
+                        } else if (change.action === 'remove') {
+                            // If quantity exists, decrease quantity
+                            if (existingItemIndex !== -1 && gameState.player.inventory[existingItemIndex].quantity !== undefined && change.item.quantity !== undefined) {
+                                gameState.player.inventory[existingItemIndex].quantity -= (typeof change.item.quantity === 'number' ? change.item.quantity : parseInt(change.item.quantity) || 1);
+                                if (gameState.player.inventory[existingItemIndex].quantity <= 0) {
+                                    gameState.player.inventory.splice(existingItemIndex, 1);
+                                }
+                            } else {
+                                gameState.player.inventory = gameState.player.inventory.filter(item => item.name !== change.item.name);
+                            }
+                        } else if (change.action === 'update') {
+                            if (existingItemIndex !== -1) {
+                                Object.assign(gameState.player.inventory[existingItemIndex], change.item);
+                            }
+                        }
+                    });
+                }
+                if (updates.playerUpdate.statusChanges) {
+                    updates.playerUpdate.statusChanges.forEach(change => {
+                        if (change.action === 'add' && !gameState.player.statuses.includes(change.status)) {
+                            gameState.player.statuses.push(change.status);
+                        } else if (change.action === 'remove') {
+                            gameState.player.statuses = gameState.player.statuses.filter(s => s !== change.status);
+                        }
+                    });
+                }
+                if (updates.playerUpdate.skillChanges) {
+                    updates.playerUpdate.skillChanges.forEach(change => {
+                        const existingSkillIndex = gameState.player.skills.findIndex(s => s.name === change.skill.name);
+                        if (change.action === 'add') {
+                            if (existingSkillIndex === -1) {
+                                gameState.player.skills.push(change.skill);
+                                gameState.narrative.eventLog.push(`Слава изучил новый навык: ${change.skill.name}!`);
+                                displayMessage(`***Слава изучил новый навык: ${change.skill.name}!***`, false);
+                                const newSkillLi = Array.from(playerSkillsEl.children).find(li => li.textContent.includes(change.skill.name));
+                                if (newSkillLi) {
+                                    newSkillLi.classList.add('upgraded');
+                                    setTimeout(() => newSkillLi.classList.remove('upgraded'), 1000);
+                                }
+                            } else {
+                                Object.assign(gameState.player.skills[existingSkillIndex], change.skill);
+                                const upgradedSkillLi = Array.from(playerSkillsEl.children).find(li => li.textContent.includes(change.skill.name));
+                                if (upgradedSkillLi) {
+                                    upgradedSkillLi.classList.add('upgraded');
+                                    setTimeout(() => upgradedSkillLi.classList.remove('upgraded'), 1000);
+                                }
+                            }
+                        } else if (change.action === 'update') {
+                            if (existingSkillIndex !== -1) {
+                                Object.assign(gameState.player.skills[existingSkillIndex], change.skill);
+                                const upgradedSkillLi = Array.from(playerSkillsEl.children).find(li => li.textContent.includes(change.skill.name));
+                                if (upgradedSkillLi) {
+                                    upgradedSkillLi.classList.add('upgraded');
+                                    setTimeout(() => upgradedSkillLi.classList.remove('upgraded'), 1000);
+                                }
+                            }
+                        }
+                    });
+                }
+                if (updates.playerUpdate.equippedItemChanges) {
+                    updates.playerUpdate.equippedItemChanges.forEach(change => {
+                        if (change.action === 'equip' && change.item) {
+                            const itemToEquip = gameState.player.inventory.find(i => i.name === change.item.name);
+                            if (itemToEquip) {
+                                const currentEquippedInSlot = gameState.player.equippedItems[change.item.slot];
+                                if (currentEquippedInSlot) {
+                                    gameState.player.inventory.push(currentEquippedInSlot);
+                                }
+                                gameState.player.equippedItems[change.item.slot] = { 
+                                    name: itemToEquip.name, 
+                                    description: itemToEquip.description, 
+                                    icon: itemToEquip.icon,
+                                    type: itemToEquip.type,
+                                    rarity: itemToEquip.rarity,
+                                    damage: itemToEquip.damage,
+                                    defense: itemToEquip.defense,
+                                    effect: itemToEquip.effect,
+                                    value: itemToEquip.value,
+                                    attackSpeed: itemToEquip.attackSpeed,
+                                    range: itemToEquip.range
+                                };
+                                gameState.player.inventory = gameState.player.inventory.filter(item => item.name !== change.item.name);
+                                gameState.narrative.eventLog.push(`Вы надели: ${change.item.name}.`);
+                                displayMessage(`Вы надели ${change.item.name}.`, false);
+                            } else {
+                                console.warn(`Item ${change.item.name} not found in inventory for equipping.`);
+                            }
+                        } else if (change.action === 'unequip' && change.slot) {
+                            const equippedItem = gameState.player.equippedItems[change.slot];
+                            if (equippedItem) {
+                                gameState.player.inventory.push({ 
+                                    name: equippedItem.name, 
+                                    description: equippedItem.description, 
+                                    type: equippedItem.type,
+                                    icon: equippedItem.icon,
+                                    rarity: equippedItem.rarity,
+                                    damage: equippedItem.damage,
+                                    defense: equippedItem.defense,
+                                    effect: equippedItem.effect,
+                                    value: equippedItem.value,
+                                    attackSpeed: equippedItem.attackSpeed,
+                                    range: equippedItem.range
+                                });
+                                gameState.player.equippedItems[change.slot] = null;
+                                gameState.narrative.eventLog.push(`Вы сняли: ${equippedItem.name}.`);
+                                displayMessage(`Вы сняли ${equippedItem.name}.`, false);
+                            }
+                        }
+                    });
+                }
+            }
+
+            if (updates.worldUpdate) {
+                if (updates.worldUpdate.currentLocation) gameState.world.currentLocation = updates.worldUpdate.currentLocation;
+                if (updates.worldUpdate.currentDate) gameState.world.currentDate = updates.worldUpdate.currentDate;
+                if (updates.worldUpdate.currentTime) gameState.world.currentTime = updates.worldUpdate.currentTime;
+                if (updates.worldUpdate.turnCounter !== undefined) gameState.world.turnCounter = updates.worldUpdate.turnCounter;
+                if (updates.worldUpdate.inCombat !== undefined) gameState.world.inCombat = updates.worldUpdate.inCombat;
+                if (updates.worldUpdate.weather) {
+                    const defaultWeatherIcon = {
+                        'Ясно': 'fa-solid fa-sun',
+                        'Облачно': 'fa-solid fa-cloud',
+                        'Дождь': 'fa-solid fa-cloud-showers-heavy',
+                        'Сильный Дождь': 'fa-solid fa-cloud-rain',
+                        'Снег': 'fa-solid fa-snowflake',
+                        'Туман': 'fa-solid fa-smog',
+                        'Гроза': 'fa-solid fa-cloud-bolt'
+                    }[updates.worldUpdate.weather.type] || 'fa-solid fa-question-circle';
+                    
+                    gameState.world.weather = {
+                        type: updates.worldUpdate.weather.type,
+                        description: updates.worldUpdate.weather.description,
+                        icon: updates.worldUpdate.weather.icon || defaultWeatherIcon
+                    };
+                }
+
+                if (updates.worldUpdate.combat) {
+                    if (updates.worldUpdate.combat.enemy) {
+                        gameState.world.combat.enemy = updates.worldUpdate.combat.enemy; 
+                    }
+                    if (updates.worldUpdate.combat.turn) {
+                        gameState.world.combat.turn = updates.worldUpdate.combat.turn;
+                    }
+                    if (updates.worldUpdate.combat.log) {
+                        gameState.world.combat.log.push(...updates.worldUpdate.combat.log); 
+                    }
+                }
+
+                if (updates.worldUpdate.npcsChanges) {
+                    updates.worldUpdate.npcsChanges.forEach(change => {
+                        const existingNpcIndex = gameState.world.npcs.findIndex(npc => npc.name === (change.name || (change.npc && change.npc.name)));
+                        if (change.action === 'add') {
+                            if (existingNpcIndex === -1 && change.npc) {
+                                gameState.world.npcs.push(change.npc);
+                            } else if (existingNpcIndex !== -1 && change.npc) {
+                                Object.assign(gameState.world.npcs[existingNpcIndex], change.npc);
+                            }
+                        } else if (change.action === 'remove') {
+                            gameState.world.npcs = gameState.world.npcs.filter(npc => npc.name !== change.name);
+                        } else if (change.action === 'update') {
+                            if (existingNpcIndex !== -1 && (change.npc || change.name)) {
+                                Object.assign(gameState.world.npcs[existingNpcIndex], change.npc || { name: change.name, description: change.description });
+                            }
+                        }
+                    });
+                }
+                if (updates.worldUpdate.locationChanges) {
+                    updates.worldUpdate.locationChanges.forEach(change => {
+                        const existingLocationIndex = gameState.world.knownLocations.findIndex(loc => loc.name === (change.name || (change.location && change.location.name)));
+                        if (change.action === 'add') {
+                            if (existingLocationIndex === -1 && change.location) {
+                                gameState.world.knownLocations.push(change.location);
+                            } else if (existingLocationIndex !== -1 && change.location) {
+                                Object.assign(gameState.world.knownLocations[existingLocationIndex], change.location);
+                            }
+                        } else if (change.action === 'remove') {
+                            gameState.world.knownLocations = gameState.world.knownLocations.filter(loc => loc.name !== change.name);
+                        } else if (change.action === 'update') {
+                            if (existingLocationIndex !== -1 && (change.location || change.name)) {
+                                Object.assign(gameState.world.knownLocations[existingLocationIndex], change.location || { name: change.name, description: change.description });
+                            }
+                        }
+                    });
+                }
+                if (updates.worldUpdate.loreChanges) {
+                    updates.worldUpdate.loreChanges.forEach(change => {
+                        const existingLoreIndex = gameState.world.visibleLore.findIndex(lore => lore.title === change.lore.title);
+                        if (change.action === 'add') {
+                            if (existingLoreIndex === -1) {
+                                gameState.world.visibleLore.push(change.lore);
+                            } else {
+                                Object.assign(gameState.world.visibleLore[existingLoreIndex], change.lore);
+                            }
+                        } else if (change.action === 'update') {
+                            if (existingLoreIndex !== -1) {
+                                Object.assign(gameState.world.visibleLore[existingLoreIndex], change.lore);
+                            }
+                        }
+                    });
+                }
+            }
+            if (updates.eventLogChanges) {
+                updates.eventLogChanges.forEach(change => {
+                    if (change.action === 'add' && change.entry) {
+                        gameState.narrative.eventLog.push(change.entry);
+                    }
+                });
+            }
+
+            displayGameInfo();
+        }
+
+        // --- Game Initialization ---
+        function startGame() {
+            // Start with a fresh copy of the default template
+            gameState = JSON.parse(JSON.stringify(defaultGameStateTemplate));
+            gameOutput.innerHTML = '';
+            displayMessage(gameState.narrative.currentScene.text);
+            displayGameInfo();
+            saveGameState();
+        }
+
+        // --- Event Handlers ---
+        submitCommandBtn.addEventListener('click', () => {
+            const command = commandInput.value.trim();
+            if (command) {
+                processCommand(command);
+            }
+        });
+
+        commandInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                submitCommandBtn.click();
+            }
+        });
+
+        // Initialize Firebase on window load
+        window.onload = initializeFirebase;
+
+        // Ensure hiding tooltip if clicking outside anywhere on the document
+        document.body.addEventListener('click', (event) => {
+            if (!event.target.closest('.skill-item') && 
+                !event.target.closest('.inventory-item') &&
+                !event.target.closest('.npc-item') &&
+                !event.target.closest('.location-item') &&
+                !event.target.closest('.lore-item') &&
+                !event.target.closest('.equipment-list-item') &&
+                !event.target.closest('.game-tooltip')) {
+                hideTooltip();
+            }
+        });
+
+    </script>
+</body>
+</html>
+
