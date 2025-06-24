@@ -295,7 +295,14 @@
     <script type="module">
         // --- Global Firebase variables (provided by Canvas) ---
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const firebaseConfig = {
+  apiKey: "AIzaSyDwI2es5lgJSXcY2bW8KMTNPK2bwt7MGak",
+  authDomain: "slava-vesteria.firebaseapp.com",
+  projectId: "slava-vesteria",
+  storageBucket: "slava-vesteria.firebasestorage.app",
+  messagingSenderId: "839628564283",
+  appId: "1:839628564283:web:48296ca97096414a83f91e"
+};
         const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         // --- Firebase imports ---
